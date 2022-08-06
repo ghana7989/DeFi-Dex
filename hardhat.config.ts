@@ -13,13 +13,7 @@ const config: HardhatUserConfig = {
 	networks: {
 		localhost: {},
 	},
-	paths: {
-		sources: './blockchain/contracts',
-		tests: './blockchain/test',
-		artifacts: './blockchain/artifacts',
-		cache: './blockchain/cache',
-		root: './',
-	},
+
 	defaultNetwork: 'localhost',
 	gasReporter: {
 		enabled: true,
