@@ -130,4 +130,67 @@ describe('Token', () => {
 			});
 		});
 	});
+
+	describe('Delegated Token Transfer', () => {
+		let amount: PromiseOrValue<BigNumberish>;
+		let txn: ContractTransaction;
+		let result: ContractReceipt;
+
+		beforeEach(async () => {
+			amount = tokens(100);
+			txn = await csToken.connect(owner).approve(address1.address, amount);
+			result = await txn.wait();
+		});
+
+		describe('Success', () => {
+			beforeEach(async () => {
+				txn = await csToken
+					.connect(address1)
+					.transferFrom(owner.address, address2.address, amount);
+				result = await txn.wait();
+			});
+			it('transfers token balances', async () => {
+				expect(await csToken.balanceOf(address2.address)).to.equal(amount);
+				expect(await csToken.balanceOf(owner.address)).to.equal(tokens(999900));
+			});
+
+			it('resets the allowance', async () => {
+				expect(
+					await csToken.allowance(owner.address, address1.address),
+				).to.equal(0);
+			});
+
+			it('emits a Transfer event', async () => {
+				const eventLog = result.events!.pop();
+				expect(eventLog.event).equal('Transfer');
+				expect(eventLog.args.from).equal(owner.address);
+				expect(eventLog.args.to).equal(address2.address);
+				expect(eventLog.args.value).equal(amount);
+			});
+		});
+
+		describe('Failure', () => {
+			it('rejects when the sender did not approve the spender', async () => {
+				// here we are not approving the spender so it fails
+				expect(
+					csToken
+						.connect(address1)
+						.transferFrom(owner.address, address2.address, amount),
+				).to.be.revertedWith('revert');
+			});
+			it('rejects when the sender has insufficient allowance', async () => {
+				const invalidAmount = tokens(10000000000);
+				expect(
+					csToken
+						.connect(address1)
+						.transferFrom(owner.address, address2.address, invalidAmount),
+				).to.be.revertedWith('ERC20: insufficient allowance');
+			});
+			it('rejects when receiver is Zero address', async () => {
+				expect(
+					csToken.connect(owner).transfer(zeroAddress, tokens(100)),
+				).to.be.revertedWith('invalid address');
+			});
+		});
+	});
 });
