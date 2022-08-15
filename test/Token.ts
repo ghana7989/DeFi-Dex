@@ -28,7 +28,7 @@ describe('Token', () => {
 			'Token',
 			owner,
 		);
-		csToken = await csTokenFactory.deploy();
+		csToken = await csTokenFactory.deploy(name, symbol, initialSupply);
 	});
 
 	describe('Deployment', () => {

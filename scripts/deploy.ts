@@ -4,7 +4,11 @@ async function main() {
 	// Fetch Contract
 	const Token = await ethers.getContractFactory('Token');
 	// Deploy Contract
-	const token = await Token.deploy();
+	const token = await Token.deploy(
+		'CSToken',
+		'CS',
+		ethers.utils.parseEther('1000000'),
+	);
 	await token.deployed();
 	console.log(token.address);
 }

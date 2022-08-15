@@ -7,7 +7,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
 contract Token is ERC20, Ownable {
-    constructor() ERC20("ConSector", "CS") {
-        _mint(msg.sender, 1000000 * 10**18);
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        uint256 _totalSupply
+    ) ERC20(_name, _symbol) {
+        _mint(msg.sender, _totalSupply);
     }
 }
