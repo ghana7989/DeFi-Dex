@@ -23,9 +23,11 @@
 		"start": "react-scripts start",
 		"build": "react-scripts build",
 		"test": "hardhat test",
-		"test:watch": "npx nodemon --watch test/Token.ts --exec yarn test",
+		"test:watch": "npx nodemon --watch test/Exchange.ts --exec yarn test test/Exchange.ts",
 		"eject": "react-scripts eject",
-		"run-node": "hardhat node"
+		"run-node": "hardhat node",
+		"compile": "hardhat compile",
+		"compile:watch": "npx nodemon --watch contracts/Exchange.sol --exec yarn compile"
 	},
 	"eslintConfig": {
 		"extends": [
