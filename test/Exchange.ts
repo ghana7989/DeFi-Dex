@@ -7,15 +7,11 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { Exchange, Exchange__factory, Token, Token__factory } from '../typechain-types';
 
 const tokens = (n: number) => ethers.utils.parseEther(n.toString());
-const name = 'ConSector';
-const symbol = 'CS';
-const decimals = 18;
-const initialSupply = tokens(1000000);
-const zeroAddress = '0x0000000000000000000000000000000000000000';
 
 describe('Exchange', () => {
 	let exchange: Exchange;
 	let token1: Token;
+	let token2: Token;
 	let deployer: SignerWithAddress;
 	let feeAccount: SignerWithAddress;
 	let user1: SignerWithAddress;
@@ -27,7 +23,8 @@ describe('Exchange', () => {
 			'Exchange',
 		);
 		const Token: Token__factory = await ethers.getContractFactory('Token');
-		token1 = await Token.deploy(name, symbol, initialSupply);
+		token1 = await Token.deploy('ConSector', 'CS', tokens(1000000));
+		token2 = await Token.deploy('Mock Dai', 'mDAI', tokens(1000000));
 
 		[deployer, feeAccount, user1, user2] = await ethers.getSigners();
 		exchange = await ExchangeFactory.deploy(feeAccount.address, FEE_PERCENT);
@@ -168,6 +165,57 @@ describe('Exchange', () => {
 				// Withdraw more tokens than deposited
 				await expect(
 					exchange.withdrawToken(token1.address, amount),
+				).to.revertedWith('Exchange: insufficient balance');
+			});
+		});
+	});
+	describe('Making Orders', () => {
+		let transaction: ContractTransaction,
+			result: ContractReceipt,
+			amount = tokens(10);
+
+		describe('Success', () => {
+			beforeEach(async () => {
+				// Deposit tokens before making an order
+				// 1. approve tokens for exchange to spend
+				transaction = await token1
+					.connect(user1)
+					.approve(exchange.address, amount);
+				result = await transaction.wait();
+				// 2. deposit tokens
+				transaction = await exchange
+					.connect(user1)
+					.depositToken(token1.address, amount);
+				result = await transaction.wait();
+				// 3. Make Order
+				transaction = await exchange
+					.connect(user1)
+					.makeOrder(token2.address, amount, token1.address, amount);
+				result = await transaction.wait();
+			});
+
+			it('tracks the newly created order', async () => {
+				expect(await exchange.ordersCount()).to.equal(1);
+			});
+			it('emits a Order event', async () => {
+				const eventLog = result.events!.pop();
+
+				expect(eventLog.event).equal('Order');
+				expect(eventLog.args.id).equal(1);
+				expect(eventLog.args.user).equal(user1.address);
+				expect(eventLog.args.tokenGet).equal(token2.address);
+				expect(eventLog.args.amountGet).equal(amount);
+				expect(eventLog.args.tokenGive).equal(token1.address);
+				expect(eventLog.args.amountGive).equal(amount);
+				expect(eventLog.args.timestamp).to.at.least(1);
+			});
+		});
+		describe('Failure', () => {
+			it('fails when insufficient balance', async () => {
+				await expect(
+					exchange
+						.connect(user1)
+						.makeOrder(token2.address, amount, token1.address, amount),
 				).to.revertedWith('Exchange: insufficient balance');
 			});
 		});
