@@ -1,15 +1,10 @@
-import {expect} from 'chai';
-import {ContractReceipt, ContractTransaction} from 'ethers';
-import {ethers} from 'hardhat';
+import { expect } from 'chai';
+import { ContractReceipt, ContractTransaction } from 'ethers';
+import { ethers } from 'hardhat';
 
-import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
-import {
-	Exchange,
-	Exchange__factory,
-	Token,
-	Token__factory,
-} from '../typechain-types';
+import { Exchange, Exchange__factory, Token, Token__factory } from '../typechain-types';
 
 const tokens = (n: number) => ethers.utils.parseEther(n.toString());
 const name = 'ConSector';
@@ -51,6 +46,30 @@ describe('Exchange', () => {
 		});
 	});
 
+	describe('Checking Balances', () => {
+		let transaction: ContractTransaction,
+			result: ContractReceipt,
+			amount = tokens(1);
+
+		beforeEach(async () => {
+			// approve tokens for exchange to spend
+			transaction = await token1
+				.connect(user1)
+				.approve(exchange.address, amount);
+			result = await transaction.wait();
+			// deposit tokens
+			transaction = await exchange
+				.connect(user1)
+				.depositToken(token1.address, amount);
+			result = await transaction.wait();
+		});
+
+		it('returns user balance', async () => {
+			expect(await exchange.balanceOf(token1.address, user1.address)).to.equal(
+				amount,
+			);
+		});
+	});
 	describe('Depositing Tokens', () => {
 		let transaction: ContractTransaction,
 			result: ContractReceipt,
@@ -69,6 +88,7 @@ describe('Exchange', () => {
 					.depositToken(token1.address, amount);
 				result = await transaction.wait();
 			});
+
 			it('tracks the deposited tokens', async () => {
 				// balance update
 				expect(await token1.balanceOf(exchange.address)).to.equal(amount);
@@ -77,6 +97,7 @@ describe('Exchange', () => {
 					await exchange.balanceOf(token1.address, user1.address),
 				).to.equal(amount);
 			});
+
 			it('emits a Deposit event', async () => {
 				const eventLog = result.events!.pop();
 				expect(eventLog.event).equal('Deposit');
@@ -95,6 +116,59 @@ describe('Exchange', () => {
 				await expect(
 					exchange.depositToken(token1.address, amount),
 				).to.revertedWith('ERC20: insufficient allowance');
+			});
+		});
+	});
+	describe('Withdrawing Tokens', () => {
+		let transaction: ContractTransaction,
+			result: ContractReceipt,
+			amount = tokens(10);
+
+		describe('Success', () => {
+			beforeEach(async () => {
+				// approve tokens for exchange to spend
+				transaction = await token1
+					.connect(user1)
+					.approve(exchange.address, amount);
+				result = await transaction.wait();
+				// deposit tokens
+				transaction = await exchange
+					.connect(user1)
+					.depositToken(token1.address, amount);
+				result = await transaction.wait();
+				// now withdraw tokens
+				transaction = await exchange
+					.connect(user1)
+					.withdrawToken(token1.address, amount);
+				result = await transaction.wait();
+			});
+
+			it('withdraws tokens', async () => {
+				// balance update
+				expect(await token1.balanceOf(exchange.address)).to.equal(0);
+				// user tokens update
+				expect(
+					await exchange.balanceOf(token1.address, user1.address),
+				).to.equal(0);
+			});
+
+			it('emits a Withdraw event', async () => {
+				const eventLog = result.events!.pop();
+
+				expect(eventLog.event).equal('Withdraw');
+
+				expect(eventLog.args.token).equal(token1.address);
+				expect(eventLog.args.user).equal(user1.address);
+				expect(eventLog.args.amount).equal(amount);
+				expect(eventLog.args.balance).equal(0);
+			});
+		});
+		describe('Failure', () => {
+			it('fails when insufficient balance', async () => {
+				// Withdraw more tokens than deposited
+				await expect(
+					exchange.withdrawToken(token1.address, amount),
+				).to.revertedWith('Exchange: insufficient balance');
 			});
 		});
 	});
