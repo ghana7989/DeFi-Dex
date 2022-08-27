@@ -11,7 +11,9 @@ contract Exchange {
     //------------START Mapping ------------------
     mapping(address => mapping(address => uint256)) public tokens;
 
-    mapping(uint256 => _Order) orders; // this is a map of order id to _Order struct
+    mapping(uint256 => _Order) public orders; // this is a map of order id to _Order struct
+    mapping(uint256 => bool) public orderCancelled;
+    mapping(uint256 => bool) public orderFilled;
     //------------END ------------------
 
     // Structs
@@ -45,6 +47,26 @@ contract Exchange {
         uint256 amountGet,
         address tokenGive,
         uint256 amountGive,
+        uint256 timestamp
+    );
+    event Cancel(
+        uint256 id,
+        address user,
+        address tokenGet,
+        uint256 amountGet,
+        address tokenGive,
+        uint256 amountGive,
+        uint256 timestamp
+    );
+
+    event Trade(
+        uint256 id,
+        address user,
+        address tokenGet,
+        uint256 amountGet,
+        address tokenGive,
+        uint256 amountGive,
+        address creator, // creator of the trade
         uint256 timestamp
     );
 
@@ -126,5 +148,92 @@ contract Exchange {
             _amountGive,
             block.timestamp
         );
+    }
+
+    function cancelOrder(uint256 _orderId) public {
+        _Order storage _order = orders[_orderId];
+        require(_order.id == _orderId, "Exchange: orderId doesn't exist");
+        require(
+            address(_order.user) == msg.sender,
+            "Exchange: you can ONLY cancel your own orders"
+        );
+        // Cancel order
+        orderCancelled[_orderId] = true;
+        // Emit Cancel event
+        emit Cancel(
+            _orderId,
+            _order.user,
+            _order.tokenGet,
+            _order.amountGet,
+            _order.tokenGive,
+            _order.amountGive,
+            block.timestamp
+        );
+    }
+
+    // ------------------------------END-----------------------------------------------
+    // -----------------------------------------------------------------------------
+    // Execute order
+
+    function _trade(
+        uint256 _orderId,
+        address _user,
+        address _tokenGet,
+        uint256 _amountGet,
+        address _tokenGive,
+        uint256 _amountGive
+    ) internal {
+        // 1. msg.sender is the one who fills the order
+        // 2. _user is the one who creates the order
+
+        // fee is paid by the msg.sender
+        uint256 _feeAmount = (uint256(_amountGive) * uint256(feePercent)) / 100;
+
+        tokens[_tokenGet][msg.sender] -= (_amountGet + _feeAmount);
+        tokens[_tokenGet][_user] += _amountGet;
+
+        // charge fee to fee account
+        tokens[_tokenGet][feeAccount] += _feeAmount;
+
+        tokens[_tokenGive][msg.sender] += _amountGive;
+        tokens[_tokenGive][_user] -= _amountGive;
+
+        // Emit Trade event
+        emit Trade(
+            _orderId,
+            msg.sender,
+            _tokenGet,
+            _amountGet,
+            _tokenGive,
+            _amountGive,
+            _user,
+            block.timestamp
+        );
+    }
+
+    function fillOrder(uint256 _orderId) public {
+        // Must be a valid order
+        require(
+            orders[_orderId].id == _orderId,
+            "Exchange: orderId doesn't exist"
+        );
+        // Order cant be filled
+        require(!orderFilled[_orderId], "Exchange: order already filled");
+        // Order cant be cancelled
+        require(!orderCancelled[_orderId], "Exchange: order already cancelled");
+
+        // Fetch order
+        _Order storage _order = orders[_orderId];
+        // Swapping Tokens
+        _trade(
+            _order.id,
+            _order.user,
+            _order.tokenGet,
+            _order.amountGet,
+            _order.tokenGive,
+            _order.amountGive
+        );
+        // Mark order as filled
+        orderFilled[_order.id] = true;
     }
 }
