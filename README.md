@@ -11,3 +11,5 @@ GAS_REPORT=true npx hardhat test
 npx hardhat node
 npx hardhat run scripts/deploy.ts
 ```
+
+<img src="./smart_contract_exchange.jpg" alt="Hardhat" />
